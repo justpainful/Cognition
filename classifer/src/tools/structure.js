@@ -4,6 +4,7 @@
 
 import { tool, z } from '../kit.js';
 import {
+  get,
   post,
   patch,
   put,
@@ -11,6 +12,7 @@ import {
   fetchChannels,
   fetchRoles,
   fetchGuild,
+  fetchMe,
   guildRoute,
   CHANNEL_TYPE,
   CHANNEL_TYPE_NAME,
@@ -187,6 +189,30 @@ tool({
         '',
         `To undo: guild_edit name="${before.name}"`,
       ].join('\n'),
+    };
+  },
+});
+
+tool({
+  name: 'nickname_set',
+  title: "Set the bot's nickname",
+  description:
+    "Change the name Cognition displays under in this guild. Cosmetic and per-guild: the account's real username is unaffected. Pass null to clear it.",
+  mutating: true,
+  schema: {
+    nick: z.string().max(32).nullable().describe('null clears the nickname'),
+    reason: z.string().optional(),
+  },
+  async run({ nick, reason }) {
+    // PATCH accepts /members/@me, but there is no GET counterpart a bot may use:
+    // /users/@me/guilds/{id}/member is OAuth-bearer only and answers 403 for
+    // bots. Read the member back by id instead.
+    const self = await fetchMe();
+    const before = await get(guildRoute(`/members/${self.id}`));
+    await patch(guildRoute('/members/@me'), { nick }, { reason: reason ?? 'Classifer: nickname_set' });
+    return {
+      target: GUILD_ID,
+      text: `Nickname "${before.nick ?? '(none)'}" -> "${nick ?? '(none)'}"\n\nTo undo: nickname_set nick=${before.nick ? `"${before.nick}"` : 'null'}`,
     };
   },
 });
