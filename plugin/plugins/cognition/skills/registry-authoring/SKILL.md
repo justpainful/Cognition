@@ -122,6 +122,12 @@ publish time.
 3. `simulate-click` — run it as the person who reported the problem, with their real
    roles. The `requires` verdict prints first.
 4. `audit_tail source=dispatcher result=error` — every failed press with its reason.
-5. If all of that is clean and the button still does nothing in Discord, the bot
-   process is down. Classifer keeps working when it is, which is exactly why the
+5. `system_status` — check two lines. `bot engine STALE` means the running process
+   predates your engine changes and will reject kinds that plainly exist; restart
+   it. Nothing at all from `dispatcher` in a recent `audit_tail` means the bot is
+   down entirely. Classifer keeps working in both cases, which is exactly why the
    symptom is confusing.
+
+Note the trap in step 3: `simulate-click` runs in a fresh process and always loads
+the newest engine, so it cannot reproduce a stale-bot failure. Simulation passing
+while a real click fails with "unknown action kind" is that gap, every time.

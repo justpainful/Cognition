@@ -95,6 +95,17 @@ still pressable by anyone who finds the message.
 The panel does not need reposting and the bot does not need restarting — the
 Dispatcher holds no cache, so there is nothing to invalidate.
 
+That applies to **rows**. It does not apply to the **engine**. Node caches modules at
+import, so a running bot keeps executing the code it started with: if you add a new
+action kind or change the executor, the live bot will reject it as an unknown kind
+until it is restarted. `system_status` reports `bot engine STALE` when the build the
+bot recorded at startup no longer matches disk — check it before concluding a
+Registry row is wrong.
+
+`simulate-click` will not reproduce this, because it starts a fresh process and
+always loads the newest engine. If simulation passes and a real click fails with an
+unknown kind, that gap is the answer.
+
 To change what an already-posted button points at without touching its action, use
 `registry_component_put` to repoint the component.
 

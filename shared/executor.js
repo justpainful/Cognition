@@ -12,7 +12,7 @@
 
 import { get, post, patch, put, del, guildRoute, CHANNEL_TYPE, permBits } from './rest.js';
 import { GUILD_ID } from './env.js';
-import { getAction, getSession, updateSession } from './registry.js';
+import { getAction, getSession, updateSession, ACTION_KINDS as KNOWN_KINDS } from './registry.js';
 import { evaluate } from './predicates.js';
 import { buildScope, render } from './template.js';
 import { tidySlug, addTag, stripTag, TEST_TAG, ARCHIVED_TAG } from './naming.js';
@@ -331,7 +331,15 @@ export async function execute(ref, ctx, depth = 0) {
     }
 
     default:
-      throw new ActionError(`Unknown action kind "${action.kind}".`);
+      // The likeliest cause is not a typo. A kind that was added to the engine
+      // after this process started does not exist in this process, because Node
+      // cached the modules at import — so say that rather than leaving it to be
+      // guessed at.
+      throw new ActionError(
+        `Unknown action kind "${action.kind}". This process knows: ${KNOWN_KINDS.join(', ')}.\n` +
+          `If that kind was added recently, the running bot predates it — restart it. ` +
+          `Registry edits apply live; engine edits need a restart.`,
+      );
   }
 
   return { log };

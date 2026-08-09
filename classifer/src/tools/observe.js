@@ -18,6 +18,7 @@ import { LOG_CHANNEL_SETTING } from '../../../shared/audit.js';
 import { listPending } from '../../../shared/guard.js';
 import { GUILD_ID } from '../../../shared/env.js';
 import { nextRun } from '../../../shared/cron.js';
+import { engineHash } from '../../../shared/version.js';
 
 function tree(channels) {
   const cats = channels.filter((c) => c.type === 4).sort((a, b) => a.position - b.position);
@@ -217,6 +218,25 @@ tool({
       lines.push(`guild      ok — "${guild.name}" (${GUILD_ID})`);
     } catch (e) {
       lines.push(`guild      FAILED — ${e.message}`);
+    }
+
+    // The bot stamps the engine build it loaded at startup. If disk has moved on,
+    // the process is executing older code and will reject things that plainly
+    // exist — the one failure here that looks like a bug in the Registry.
+    const onDisk = engineHash();
+    const running = getSetting('bot_engine_hash');
+    const startedAt = getSetting('bot_started_at');
+    if (!running) {
+      lines.push('bot        never started since this Registry was created');
+    } else if (running === onDisk) {
+      lines.push(`bot engine ok — build ${onDisk}, last started ${startedAt}`);
+    } else {
+      lines.push(
+        `bot engine STALE — running ${running}, disk is ${onDisk}\n` +
+          `           The bot has been up since ${startedAt} and Node cached the modules it\n` +
+          `           loaded then. Registry edits still apply live; engine edits do not.\n` +
+          `           Restart it (npm run bot) or actions added since will fail as "unknown kind".`,
+      );
     }
 
     const logChannel = getSetting(LOG_CHANNEL_SETTING);

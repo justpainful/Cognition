@@ -10,8 +10,9 @@
 
 import { Client, GatewayIntentBits, Events, ActivityType } from 'discord.js';
 import { requireEnv, TOKEN, GUILD_ID } from '../shared/env.js';
-import { getDb } from '../shared/store.js';
+import { getDb, setSetting } from '../shared/store.js';
 import { log as auditLog } from '../shared/audit.js';
+import { engineHash } from '../shared/version.js';
 import { listSchedules } from '../shared/registry.js';
 import { attach } from './dispatcher.js';
 import { start as startScheduler } from './scheduler.js';
@@ -41,6 +42,14 @@ client.once(Events.ClientReady, async (ready) => {
 
   const schedules = listSchedules({ enabledOnly: true });
   console.error(`[cognition] ${schedules.length} enabled schedule(s)`);
+
+  // Record which build of the engine this process actually loaded. Node caches
+  // modules at import, so from here on this process runs THIS code no matter
+  // what changes on disk — and system_status needs to be able to say so.
+  const build = engineHash();
+  setSetting('bot_engine_hash', build);
+  setSetting('bot_started_at', new Date().toISOString());
+  console.error(`[cognition] engine build ${build}`);
 
   ready.user.setPresence({
     status: 'online',

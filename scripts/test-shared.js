@@ -7,7 +7,7 @@
 //
 //   npm test
 
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -185,6 +185,22 @@ throws('schedule rejects a missing action', () => registry.putSchedule({ key: 's
 registry.putSchedule({ key: 's_ok', cron: '*/5 * * * *', actionKey: 't_reply' });
 t('schedule round trips', registry.getSchedule('s_ok').cron === '*/5 * * * *');
 t('schedule deletes', registry.deleteSchedule('s_ok') && registry.getSchedule('s_ok') === null);
+
+// ---------------------------------------------------------------- version
+
+describe('engine fingerprint');
+const version = await import('../shared/version.js');
+const h1 = version.engineHash();
+t('hash is stable across calls', h1 === version.engineHash());
+t('hash is a short hex digest', /^[0-9a-f]{16}$/.test(h1));
+
+// Every kind the executor can dispatch must be declared, or registry_put would
+// reject an action the engine can actually run.
+describe('executor and registry agree');
+const executorSource = readFileSync(new URL('../shared/executor.js', import.meta.url), 'utf8');
+for (const kind of registry.ACTION_KINDS) {
+  t(`${kind} has a case in the executor`, executorSource.includes(`case '${kind}'`));
+}
 
 // ----------------------------------------------------------------
 

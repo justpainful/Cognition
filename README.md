@@ -56,6 +56,14 @@ restarted. The next person to press the button gets the new behaviour.
 
 **The engine is a fixed ~20 files and does not grow when the server does.**
 
+> [!IMPORTANT]
+> **Registry edits apply live. Engine edits do not.**
+> Rows are read fresh on every interaction, so behaviour changes take effect on the
+> next click. But Node caches modules at import — a running bot keeps executing the
+> code it started with, so changing `shared/`, `bot/` or `classifer/` needs a
+> restart. The bot fingerprints the engine build it loaded, and `system_status`
+> reports `bot engine STALE` when disk has moved on.
+
 ---
 
 ## Architecture
@@ -488,6 +496,19 @@ Discord token or a `.env` ever gets committed.
 The bot process is down. Classifer talks over REST and needs no gateway, so it stays
 green while the gateway is gone. That asymmetry is deliberate but it makes the
 symptom confusing — `system_status` says so explicitly rather than guessing.
+</details>
+
+<details>
+<summary><b>A button says <code>Unknown action kind "…"</code>, but the kind exists.</b></summary>
+
+The bot is running older code than what is on disk. Node caches modules at import,
+so a kind added to the executor after the process started does not exist in that
+process. Restart the bot. `system_status` reports this as `bot engine STALE` by
+comparing the build the bot recorded at startup against the files on disk.
+
+Note that `simulate-click` will *not* reproduce it — it runs in a fresh process and
+so always picks up the newest engine. That asymmetry is precisely how this class of
+bug hides.
 </details>
 
 <details>
