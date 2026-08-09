@@ -7,6 +7,7 @@
 
 import { fetchChannels } from './rest.js';
 import { getSession } from './registry.js';
+import { tidySlug } from './naming.js';
 
 /**
  * @returns {Promise<{pass: boolean, reason: string}>}
@@ -47,22 +48,23 @@ export async function evaluate(predicate, ctx = {}) {
         : { pass: false, reason: `this only works in <#${want}>` };
     }
 
-    case 'channel_exists': {
-      const channels = await fetchChannels();
-      const needle = String(predicate.name ?? '').toLowerCase();
-      const hit = channels.some((c) => c.name.toLowerCase() === needle);
-      return hit
-        ? { pass: true, reason: `#${needle} exists` }
-        : { pass: false, reason: `#${needle} does not exist` };
-    }
-
+    // Both sides are slugified before comparing. Discord slugifies text channel
+    // names on creation, so a predicate written as "ticket-{{user.name}}" must be
+    // measured against the name Discord actually produced — otherwise a username
+    // containing a dot or a space never matches its own channel.
+    case 'channel_exists':
     case 'channel_absent': {
       const channels = await fetchChannels();
-      const needle = String(predicate.name ?? '').toLowerCase();
-      const hit = channels.some((c) => c.name.toLowerCase() === needle);
-      return hit
-        ? { pass: false, reason: `#${needle} already exists` }
-        : { pass: true, reason: `#${needle} is free` };
+      const needle = tidySlug(String(predicate.name ?? ''));
+      const hit = channels.some((c) => tidySlug(c.name) === needle);
+      const wantPresent = type === 'channel_exists';
+      if (hit === wantPresent) {
+        return { pass: true, reason: wantPresent ? `#${needle} exists` : `#${needle} is free` };
+      }
+      return {
+        pass: false,
+        reason: wantPresent ? `#${needle} does not exist` : `you already have #${needle} open`,
+      };
     }
 
     case 'session_state': {

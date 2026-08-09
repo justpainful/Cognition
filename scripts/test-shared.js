@@ -143,6 +143,13 @@ t('tolerates whitespace', template.renderString('{{ user.name }}', scope) === 'k
 t('leaves unknown placeholders standing', template.renderString('{{user.nmae}}', scope) === '{{user.nmae}}');
 t('renders nested structures', template.render({ a: ['{{user.id}}'] }, scope).a[0] === '7');
 t('reports unresolved keys', template.unresolved({ x: '{{created.id}}' }, scope).includes('created.id'));
+// A requires clause is rendered against the same scope as params, which is what
+// makes "one open ticket each" expressible as {"name":"ticket-{{user.name}}"}.
+// Before this, the raw clause was evaluated and matched nothing.
+t(
+  'renders a predicate clause',
+  template.render({ type: 'channel_absent', name: 'ticket-{{user.name}}' }, scope).name === 'ticket-kuroi',
+);
 
 // ---------------------------------------------------------------- predicates
 

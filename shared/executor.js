@@ -65,11 +65,16 @@ export async function execute(ref, ctx, depth = 0) {
 
   const action = resolveAction(ref);
   const log = [];
+  const scope = buildScope(ctx);
 
   // A requires clause on a nested action is checked too. Composition must not be
   // a way to get around a restriction placed on the piece being composed.
+  //
+  // The predicate is rendered against the same scope as the params, so a clause
+  // can talk about the person pressing the button — {"type":"channel_absent",
+  // "name":"ticket-{{user.name}}"} is what "one open ticket each" looks like.
   if (action.requires) {
-    const verdict = await evaluate(action.requires, ctx);
+    const verdict = await evaluate(render(action.requires, scope), ctx);
     if (!verdict.pass) throw new ActionError(verdict.reason);
   }
 
@@ -80,7 +85,6 @@ export async function execute(ref, ctx, depth = 0) {
     );
   }
 
-  const scope = buildScope(ctx);
   const p = render(action.params ?? {}, scope);
   const reason = `Cognition: ${action.key} (${ctx.source ?? 'system'})`;
 
@@ -200,7 +204,12 @@ export async function execute(ref, ctx, depth = 0) {
       if (p.name_prefix !== undefined || p.name_suffix !== undefined) {
         const current = await get(`/channels/${p.channel_id}`);
         const base = body.name ?? current.name;
-        const next = `${p.name_prefix ?? ''}${base}${p.name_suffix ?? ''}`;
+        // Applying the same marker twice is the common case, not the rare one —
+        // closing an already-closed ticket should be a no-op, not
+        // "closed-closed-ticket-x". Skip a prefix or suffix already present.
+        const prefix = p.name_prefix && !base.startsWith(p.name_prefix) ? p.name_prefix : '';
+        const suffix = p.name_suffix && !base.endsWith(p.name_suffix) ? p.name_suffix : '';
+        const next = `${prefix}${base}${suffix}`;
         body.name = current.type === CHANNEL_TYPE.category ? next : tidySlug(next);
       }
 

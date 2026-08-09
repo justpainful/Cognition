@@ -13,6 +13,7 @@ import { closeDb } from '../shared/store.js';
 import { getComponent, getAction } from '../shared/registry.js';
 import { execute } from '../shared/executor.js';
 import { evaluate } from '../shared/predicates.js';
+import { buildScope, render } from '../shared/template.js';
 import { log as auditLog } from '../shared/audit.js';
 import { GUILD_ID, requireEnv } from '../shared/env.js';
 import { get, guildRoute, fetchGuild } from '../shared/rest.js';
@@ -65,8 +66,14 @@ const ctx = {
 console.log(`\nSimulating: ${componentKey} "${component.spec.label ?? ''}" -> ${component.actionKey} (${action.kind})`);
 console.log(`As: ${ctx.user.username} (${userId}), ${member.roles.length} role(s)\n`);
 
+// Report the verdict for visibility, but render the predicate exactly as the
+// executor does first. An earlier version checked the raw clause and cheerfully
+// announced that "#ticket-user-name" was free — reporting on a predicate the
+// executor would never evaluate. The executor re-checks anyway; this is a
+// preview, and a preview that disagrees with the thing it previews is worse
+// than no preview.
 if (action.requires) {
-  const verdict = await evaluate(action.requires, ctx);
+  const verdict = await evaluate(render(action.requires, buildScope(ctx)), ctx);
   console.log(`requires: ${verdict.pass ? 'PASS' : 'BLOCKED'} — ${verdict.reason}\n`);
   if (!verdict.pass) {
     closeDb();
