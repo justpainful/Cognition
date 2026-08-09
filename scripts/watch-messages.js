@@ -15,7 +15,10 @@ import { get, fetchChannels, fetchMe, CHANNEL_TYPE } from '../shared/rest.js';
 
 requireEnv();
 
-const CATEGORY = process.argv[2] || '1536064615635484766'; // Tickets [TEST]
+// With no category given, watch the whole guild. Scoping to one category was
+// how this started and it silently missed every channel created afterwards,
+// which for a server that grows by creating channels is most of them.
+const CATEGORY = process.argv[2] && process.argv[2] !== 'all' ? process.argv[2] : null;
 const POLL_MS = Math.max(5, Number(process.argv[3]) || 12) * 1000;
 
 const me = await fetchMe();

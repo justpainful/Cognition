@@ -23,6 +23,7 @@ import './tools/schedule.js';
 import './tools/safety.js';
 import './tools/triggers.js';
 import './tools/gaps.js';
+import './tools/transcript.js';
 import './tools/bootstrap.js';
 
 // stdout carries the MCP protocol and nothing else. A stray console.log from any
