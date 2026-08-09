@@ -1,21 +1,30 @@
-MIT License
+Copyright (c) 2026 Faisal Saud. All rights reserved.
 
-Copyright (c) 2026 justpainful
+PROPRIETARY — SOURCE-AVAILABLE, NOT OPEN SOURCE.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This repository is published so that it can be read. Publishing it grants no
+license of any kind.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+YOU MAY:
+  - View, read, and study the contents of this repository.
+  - Quote short excerpts for commentary, review, or teaching, with attribution.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+YOU MAY NOT, without prior written permission from the copyright holder:
+  - Copy, reproduce, modify, adapt, translate, or create derivative works.
+  - Reuse the text, layout, design, or assets in another profile or product.
+  - Publish, sublicense, sell, host, or otherwise transfer any part of it.
+  - Use it, or anything derived from it, to train, fine-tune, benchmark, or
+    evaluate any machine learning model, dataset, or AI system.
+  - Remove, obscure, or alter this notice.
+
+THIRD-PARTY ASSETS: any image, animation, font, or other material in this
+repository that was not authored by the copyright holder remains the property
+of its respective owner and is used under its own terms. Nothing here claims
+rights over such material.
+
+Permission may be granted, and is granted only in writing. Requests:
+https://github.com/justpainful
+
+Any use not expressly permitted above is prohibited.
+
+THE CONTENTS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
