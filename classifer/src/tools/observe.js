@@ -150,6 +150,38 @@ tool({
 });
 
 tool({
+  name: 'members_list',
+  title: 'List everyone in the guild',
+  description:
+    'Every member with the roles they hold and when they joined. members_search needs a name to look for; this is for when the question is who is here at all.',
+  schema: {
+    limit: z.number().int().min(1).max(1000).default(200).optional(),
+    include_bots: z.boolean().default(true).optional(),
+  },
+  async run({ limit = 200, include_bots = true }) {
+    const [members, roles, guild] = await Promise.all([
+      get(guildRoute('/members'), { query: { limit } }),
+      fetchRoles(),
+      fetchGuild(),
+    ]);
+    const roleName = (id) => roles.find((r) => r.id === id)?.name ?? id;
+    const shown = include_bots ? members : members.filter((m) => !m.user.bot);
+
+    return table(
+      shown.sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at)),
+      [
+        { header: 'id', get: (m) => m.user.id },
+        { header: 'username', get: (m) => m.user.username },
+        { header: 'nick', get: (m) => m.nick ?? '' },
+        { header: 'kind', get: (m) => (m.user.bot ? 'bot' : m.user.id === guild.owner_id ? 'owner' : 'member') },
+        { header: 'joined', get: (m) => (m.joined_at ?? '').slice(0, 10) },
+        { header: 'roles', get: (m) => (m.roles.length ? m.roles.map(roleName).join(', ') : '(none)') },
+      ],
+    );
+  },
+});
+
+tool({
   name: 'messages_read',
   title: 'Read a channel',
   description: 'Recent messages in a channel, newest first. Use it to check what a panel actually posted, or to read what people said.',
