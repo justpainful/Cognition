@@ -11,9 +11,9 @@ feature is a database row, not a deploy — and the bot never restarts.
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.5-5FA04E?logo=node.js&logoColor=white)](https://nodejs.org)
 [![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)](https://discord.js.org)
 [![MCP](https://img.shields.io/badge/MCP-server-000000)](https://modelcontextprotocol.io)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 
-[The idea](#the-idea) · [Architecture](#architecture) · [Quick start](#quick-start) · [The Registry](#the-registry) · [Skills](#the-skills) · [Scheduling](#scheduling) · [Safety](#the-safety-model) · [Tools](#tool-reference)
+[The idea](#the-idea) · [Architecture](#architecture) · [Setup](#setup) · [The Registry](#the-registry) · [Skills](#the-skills) · [Scheduling](#scheduling) · [Safety](#the-safety-model) · [Tools](#tool-reference)
 
 </div>
 
@@ -124,13 +124,17 @@ answering clicks whether or not Claude Code is open.
 
 ---
 
-## Quick start
+## Setup
+
+> [!NOTE]
+> This repository is source-available, not open source — see [License](#license).
+> The steps below are the project's own setup, documented so the design is
+> legible. They are not a grant of permission to copy or run it.
 
 **Requirements** — Node ≥ 22.5 (for the built-in `node:sqlite`; nothing native to
 compile), and a Discord application with Administrator in one guild.
 
 ```bash
-git clone https://github.com/justpainful/Cognition.git
 cd Cognition
 npm install
 
@@ -545,4 +549,13 @@ would break every reference. It stays.
 
 ## License
 
-[MIT](LICENSE)
+**Proprietary — source-available, not open source.** Copyright © 2026 Faisal Saud.
+All rights reserved.
+
+The repository is published so it can be read. Publishing it grants no license:
+you may view and study it, and quote short excerpts with attribution. Copying,
+modifying, redistributing, or using it to train or evaluate a machine learning
+system all require prior written permission.
+
+Read [LICENSE](LICENSE) for the exact terms — the summary above is not a
+substitute for it. Permission requests: https://github.com/justpainful

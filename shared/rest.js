@@ -42,7 +42,13 @@ export async function api(method, route, { body, reason, query } = {}) {
     'User-Agent': 'Cognition (https://github.com/local/cognition, 0.1.0)',
   };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  if (reason) headers['X-Audit-Log-Reason'] = String(reason).slice(0, 512);
+  // HTTP headers are Latin-1. An em dash or a word of Arabic in the reason throws
+  // at fetch() before the request is ever sent, which surfaces as a mystifying
+  // "cannot convert argument to a ByteString". Discord reads this header
+  // percent-decoded, so encoding it is both the fix and the documented form.
+  if (reason) {
+    headers['X-Audit-Log-Reason'] = encodeURIComponent(String(reason).slice(0, 400));
+  }
 
   const init = { method, headers };
   if (body !== undefined) init.body = JSON.stringify(body);
