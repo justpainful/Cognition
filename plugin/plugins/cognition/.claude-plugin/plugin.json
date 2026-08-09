@@ -1,0 +1,21 @@
+{
+  "name": "cognition",
+  "displayName": "Cognition",
+  "description": "Live control of one Discord server used as a lab for bots and programming experiments. Read the server, build systems as Registry data, run test sessions, schedule work, and gate anything irreversible behind a written preview.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Cognition"
+  },
+  "mcpServers": {
+    "classifer": {
+      "command": "node",
+      "args": [
+        "--disable-warning=ExperimentalWarning",
+        "${CLAUDE_PLUGIN_ROOT}/launch.js"
+      ],
+      "env": {
+        "COGNITION_HOME": "SET_BY_INSTALLER"
+      }
+    }
+  }
+}

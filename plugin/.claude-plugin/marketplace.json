@@ -1,0 +1,22 @@
+{
+  "name": "cognition",
+  "owner": {
+    "name": "Cognition"
+  },
+  "metadata": {
+    "description": "One Discord server run as a programmable lab. Not general-purpose: everything here points at a single guild.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "cognition",
+      "source": "./plugins/cognition",
+      "description": "Operate the Cognition Discord server. Claude holds the controls, the bot only executes, and behaviour is Registry data rather than code — so a new system is a row, not a deploy.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Cognition"
+      },
+      "keywords": ["discord", "cognition", "registry", "sandbox", "sessions", "scheduling"]
+    }
+  ]
+}

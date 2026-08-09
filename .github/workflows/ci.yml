@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.5 is the floor: node:sqlite lands there, and the Registry depends on it.
+        node: ['22.x', '24.x']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Syntax check every source file
+        run: |
+          find shared bot classifer scripts plugin -name '*.js' -print0 \
+            | xargs -0 -n1 node --check
+
+      - name: Unit tests
+        run: npm test
+
+  manifests:
+    name: manifests are valid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Plugin and marketplace manifests parse
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const mk = JSON.parse(fs.readFileSync('plugin/.claude-plugin/marketplace.json', 'utf8'));
+            const pl = JSON.parse(fs.readFileSync('plugin/plugins/cognition/.claude-plugin/plugin.json', 'utf8'));
+            if (!mk.plugins?.length) throw new Error('marketplace lists no plugins');
+            if (!pl.mcpServers?.classifer) throw new Error('plugin declares no classifer server');
+            console.log('manifests ok:', mk.name, '->', pl.name, pl.version);
+          "
+
+      - name: Every skill has frontmatter with a name and description
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const dir = 'plugin/plugins/cognition/skills';
+            const skills = fs.readdirSync(dir);
+            if (!skills.length) throw new Error('no skills found');
+            for (const s of skills) {
+              const text = fs.readFileSync(\`\${dir}/\${s}/SKILL.md\`, 'utf8');
+              const m = text.match(/^---\n([\s\S]*?)\n---/);
+              if (!m) throw new Error(\`\${s}: no frontmatter\`);
+              if (!/^name:\s*\S/m.test(m[1])) throw new Error(\`\${s}: no name\`);
+              if (!/^description:\s*\S/m.test(m[1])) throw new Error(\`\${s}: no description\`);
+            }
+            console.log(\`\${skills.length} skills ok\`);
+          "
+
+      - name: No committed secrets
+        run: |
+          if git ls-files | grep -qx '.env'; then
+            echo '.env is tracked — it must never be committed'
+            exit 1
+          fi
+          # Discord bot tokens are three dot-separated base64url segments.
+          if git grep -nIE '[A-Za-z0-9_-]{24,28}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,40}' -- . ':!*.md'; then
+            echo 'possible Discord token committed'
+            exit 1
+          fi
+          echo 'no secrets found'
