@@ -10,6 +10,7 @@ import {
   del,
   fetchChannels,
   fetchRoles,
+  fetchGuild,
   guildRoute,
   CHANNEL_TYPE,
   CHANNEL_TYPE_NAME,
@@ -154,6 +155,39 @@ tool({
   async run({ items, reason }) {
     await patch(guildRoute('/channels'), items, { reason: reason ?? 'Classifer: channels_reorder' });
     return { target: items.map((i) => i.id).join(','), text: `Repositioned ${items.length} channel(s).` };
+  },
+});
+
+tool({
+  name: 'guild_edit',
+  title: 'Rename the server',
+  description:
+    'Change the guild itself: its name, or the channel used for system messages. The old value is recorded in the audit trail and returned, so the change is reversible by calling this again with it.',
+  mutating: true,
+  schema: {
+    name: z.string().min(2).max(100).optional(),
+    system_channel_id: z.string().nullable().optional(),
+    reason: z.string().optional(),
+  },
+  async run({ name, system_channel_id, reason }) {
+    const before = await fetchGuild();
+    const body = {};
+    if (name !== undefined) body.name = name;
+    if (system_channel_id !== undefined) body.system_channel_id = system_channel_id;
+    if (!Object.keys(body).length) return 'Nothing to change — no fields given.';
+
+    const after = await patch(guildRoute(), body, { reason: reason ?? 'Classifer: guild_edit' });
+
+    return {
+      target: GUILD_ID,
+      text: [
+        `Renamed the server.`,
+        `  before  "${before.name}"`,
+        `  after   "${after.name}"`,
+        '',
+        `To undo: guild_edit name="${before.name}"`,
+      ].join('\n'),
+    };
   },
 });
 
