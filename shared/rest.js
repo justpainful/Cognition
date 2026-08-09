@@ -81,6 +81,34 @@ export async function api(method, route, { body, reason, query } = {}) {
   throw new DiscordError(429, 'rate limited after 5 attempts', `${method} ${route}`);
 }
 
+/**
+ * Multipart upload. Kept separate from api() because fetch must be left to set
+ * Content-Type itself: the boundary is generated with the body, and setting the
+ * header by hand produces a request Discord rejects as malformed.
+ */
+export async function postMultipart(route, form, { reason } = {}) {
+  if (!TOKEN) throw new Error('DISCORD_TOKEN is not set.');
+  const headers = {
+    Authorization: `Bot ${TOKEN}`,
+    'User-Agent': 'Cognition (https://github.com/local/cognition, 0.1.0)',
+  };
+  if (reason) headers['X-Audit-Log-Reason'] = encodeURIComponent(String(reason).slice(0, 400));
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(`${BASE}${route}`, { method: 'POST', headers, body: form });
+    if (res.status === 429) {
+      const info = await res.json().catch(() => ({}));
+      await sleep(Math.min(Math.ceil((Number(info.retry_after) || 1) * 1000) + 100, 30_000));
+      continue;
+    }
+    const text = await res.text();
+    const parsed = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new DiscordError(res.status, parsed ?? text, `POST ${route} (multipart)`);
+    return parsed;
+  }
+  throw new DiscordError(429, 'rate limited after 3 attempts', `POST ${route} (multipart)`);
+}
+
 export const get = (route, opts) => api('GET', route, opts);
 export const post = (route, body, opts) => api('POST', route, { ...opts, body });
 export const patch = (route, body, opts) => api('PATCH', route, { ...opts, body });
