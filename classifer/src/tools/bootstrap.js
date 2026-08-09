@@ -182,7 +182,16 @@ tool({
   description: 'Override one of the wiring ids by hand — useful if a channel was recreated and the stored id is stale.',
   mutating: true,
   schema: {
-    key: z.enum(['command_log_channel_id', 'active_sessions_channel_id', 'sandbox_category_id', 'operator_role_id']),
+    key: z.enum([
+      'command_log_channel_id',
+      'active_sessions_channel_id',
+      'sandbox_category_id',
+      'operator_role_id',
+      'delegated_user_id',
+      'delegated_scope',
+      'delegated_at',
+      'delegated_note',
+    ]),
     value: z.string(),
   },
   async run({ key, value }) {

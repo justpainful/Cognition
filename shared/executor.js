@@ -17,6 +17,7 @@ import { evaluate } from './predicates.js';
 import { buildScope, render } from './template.js';
 import { tidySlug, addTag, stripTag, TEST_TAG, ARCHIVED_TAG } from './naming.js';
 import { encode as encodeCustomId } from './customid.js';
+import { bumpCounter } from './triggers.js';
 
 const MAX_DEPTH = 8;
 const BUTTON_STYLE = { primary: 1, secondary: 2, success: 3, danger: 4 };
@@ -123,6 +124,57 @@ export async function execute(ref, ctx, depth = 0) {
 
     case 'log': {
       log.push(String(p.message ?? ''));
+      break;
+    }
+
+    case 'dm_send': {
+      // Opening a DM channel is idempotent: Discord returns the existing one.
+      const userId = p.user_id || ctx.user?.id;
+      if (!userId) throw new ActionError('dm_send has no user to write to.');
+      if (!p.content && !p.embed) throw new ActionError('dm_send needs content or an embed.');
+      try {
+        const dm = await post('/users/@me/channels', { recipient_id: String(userId) });
+        await post(`/channels/${dm.id}/messages`, {
+          content: p.content,
+          embeds: p.embed
+            ? [{ title: p.embed.title, description: p.embed.description, color: p.embed.color ?? 0x5865f2 }]
+            : undefined,
+        });
+        log.push(`sent a DM to ${userId}`);
+      } catch (e) {
+        // Closed DMs are a setting, not a fault. A welcome flow should not die
+        // because one member does not accept messages from servers.
+        if (e.status === 403) log.push(`could not DM ${userId} — their DMs are closed`);
+        else throw e;
+      }
+      break;
+    }
+
+    case 'reaction_add': {
+      const channelId = p.channel_id || ctx.channel?.id;
+      const messageId = p.message_id || ctx.message?.id;
+      if (!channelId || !messageId) throw new ActionError('reaction_add needs a channel and a message.');
+      if (!p.emoji) throw new ActionError('reaction_add needs an emoji.');
+      await put(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(p.emoji)}/@me`);
+      log.push(`reacted ${p.emoji} to ${messageId}`);
+      break;
+    }
+
+    case 'counter_bump': {
+      // Gives actions a number to work with: ticket-0007 rather than a snowflake.
+      if (!p.key) throw new ActionError('counter_bump needs a key.');
+      const value = bumpCounter(p.key, Number(p.by ?? 1));
+      const padded = p.pad ? String(value).padStart(Number(p.pad), '0') : String(value);
+      log.push(`counter "${p.key}" is now ${value}`);
+      if (p.then) {
+        const nested = await execute(
+          p.then,
+          { ...ctx, extra: { ...(ctx.extra ?? {}), 'counter.value': padded, 'counter.key': p.key } },
+          depth + 1,
+        );
+        log.push(...nested.log);
+        return { log, created: nested.created };
+      }
       break;
     }
 

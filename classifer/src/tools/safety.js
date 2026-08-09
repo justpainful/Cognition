@@ -10,6 +10,7 @@
 import { tool, z, table } from '../kit.js';
 import {
   del,
+  put,
   get,
   post,
   fetchChannels,
@@ -200,6 +201,57 @@ async function previewRoleDelete(roleId) {
   };
 }
 
+async function previewMemberRemove(userId, op) {
+  const member = await get(guildRoute(`/members/${userId}`)).catch(() => null);
+  if (!member && op === 'member_kick') {
+    throw new Error(`No member ${userId} in this guild — nothing to kick.`);
+  }
+  const name = member ? `${member.user.username}${member.nick ? ` (${member.nick})` : ''}` : userId;
+  const joined = member?.joined_at ? member.joined_at.slice(0, 10) : 'unknown';
+
+  return [
+    `${op === 'member_ban' ? 'BAN' : 'KICK'} ${name}  (${userId})`,
+    '',
+    member ? `Joined ${joined}, holds ${member.roles.length} role(s).` : 'Not currently in the guild.',
+    op === 'member_ban'
+      ? 'A ban persists after they leave and blocks rejoining until it is lifted.'
+      : 'A kick does not block rejoining; they can come back through any valid invite.',
+    '',
+    'Their messages stay where they are. Their roles do not survive a rejoin.',
+  ].join('\n');
+}
+
+async function previewMessagesPurge(channelId, limit) {
+  const channel = await fetchChannel(channelId);
+  const messages = await get(`/channels/${channelId}/messages`, { query: { limit: Math.min(limit, 100) } });
+
+  const byAuthor = {};
+  for (const m of messages) {
+    const who = m.author?.username ?? '?';
+    byAuthor[who] = (byAuthor[who] ?? 0) + 1;
+  }
+
+  // Discord refuses to bulk-delete anything older than two weeks, so a purge
+  // that looks like it covers a conversation may stop partway through it.
+  const cutoff = Date.now() - 14 * 24 * 3600_000;
+  const tooOld = messages.filter((m) => new Date(m.timestamp).getTime() < cutoff).length;
+
+  return [
+    `PURGE up to ${limit} messages from #${channel.name}  (${channelId})`,
+    '',
+    `${messages.length} message(s) readable right now, from:`,
+    ...Object.entries(byAuthor).map(([who, n]) => `    ${n}x  ${who}`),
+    '',
+    ...messages.slice(0, 5).map((m) => `    ${m.author?.username ?? '?'}: ${(m.content || '[embed]').replace(/\s+/g, ' ').slice(0, 70)}`),
+    '',
+    tooOld
+      ? `${tooOld} of these are older than 14 days and Discord will refuse to bulk-delete them, so the purge will be partial.`
+      : 'All of these are within the 14-day bulk-delete window.',
+    '',
+    'Messages cannot be restored by anything. There is no snapshot for this.',
+  ].join('\n');
+}
+
 tool({
   name: 'destructive_plan',
   title: 'Preview something irreversible',
@@ -207,15 +259,20 @@ tool({
     `Step one of two for anything that cannot be undone. Takes a snapshot, reads the live state, and returns a written preview plus a token valid for ${TTL_MINUTES} minutes. Show the preview to the human and get a real yes before calling destructive_apply. Nothing is destroyed by this call.`,
   mutating: true,
   schema: {
-    op: z.enum(['channel_delete', 'category_delete', 'role_delete']),
-    id: z.string().describe('the channel, category or role id'),
+    op: z.enum(['channel_delete', 'category_delete', 'role_delete', 'member_kick', 'member_ban', 'messages_purge']),
+    id: z.string().describe('the channel, category, role or user id'),
+    limit: z.number().int().min(1).max(100).optional().describe('messages_purge only: how many to remove'),
     reason: z.string().optional(),
   },
-  async run({ op, id, reason }) {
+  async run({ op, id, limit, reason }) {
     let preview;
-    let snapshotId;
+    let snapshotId = null;
 
-    if (op === 'channel_delete' || op === 'category_delete') {
+    if (op === 'member_kick' || op === 'member_ban') {
+      preview = await previewMemberRemove(id, op);
+    } else if (op === 'messages_purge') {
+      preview = await previewMessagesPurge(id, limit ?? 50);
+    } else if (op === 'channel_delete' || op === 'category_delete') {
       const info = await previewChannelDelete(id);
       if (op === 'category_delete' && !info.isCategory) {
         throw new Error(`${id} is a channel, not a category. Use op "channel_delete".`);
@@ -232,6 +289,7 @@ tool({
     }
 
     const params = { id: String(id), reason: reason ?? null };
+    if (op === 'messages_purge') params.limit = limit ?? 50;
     const pending = plan({ op, params, preview, snapshotId });
 
     return {
@@ -261,23 +319,45 @@ tool({
   schema: {
     token: z.string(),
     id: z.string().describe('must match the id from the plan'),
-    op: z.enum(['channel_delete', 'category_delete', 'role_delete']),
+    op: z.enum(['channel_delete', 'category_delete', 'role_delete', 'member_kick', 'member_ban', 'messages_purge']),
+    limit: z.number().int().min(1).max(100).optional(),
     reason: z.string().optional(),
   },
-  async run({ token, id, op, reason }) {
-    const claim = redeem(token, { op, params: { id: String(id), reason: reason ?? null } });
+  async run({ token, id, op, limit, reason }) {
+    const params = { id: String(id), reason: reason ?? null };
+    if (op === 'messages_purge') params.limit = limit ?? 50;
+    const claim = redeem(token, { op, params });
+    const auditReason = reason ?? 'Classifer: destructive_apply';
 
+    let extra = '';
     if (op === 'role_delete') {
-      await del(guildRoute(`/roles/${id}`), { reason: reason ?? 'Classifer: destructive_apply' });
+      await del(guildRoute(`/roles/${id}`), { reason: auditReason });
+    } else if (op === 'member_kick') {
+      await del(guildRoute(`/members/${id}`), { reason: auditReason });
+    } else if (op === 'member_ban') {
+      await put(guildRoute(`/bans/${id}`), { delete_message_seconds: 0 }, { reason: auditReason });
+    } else if (op === 'messages_purge') {
+      const n = limit ?? 50;
+      const messages = await get(`/channels/${id}/messages`, { query: { limit: Math.min(n, 100) } });
+      const cutoff = Date.now() - 14 * 24 * 3600_000;
+      const bulk = messages.filter((m) => new Date(m.timestamp).getTime() >= cutoff).map((m) => m.id);
+      const old = messages.length - bulk.length;
+      if (bulk.length > 1) {
+        await post(`/channels/${id}/messages/bulk-delete`, { messages: bulk.slice(0, 100) }, { reason: auditReason });
+      } else if (bulk.length === 1) {
+        await del(`/channels/${id}/messages/${bulk[0]}`, { reason: auditReason });
+      }
+      extra = `
+Removed ${bulk.length} message(s).` + (old ? ` Left ${old} older than 14 days — Discord will not bulk-delete those.` : '');
     } else {
-      await del(`/channels/${id}`, { reason: reason ?? 'Classifer: destructive_apply' });
+      await del(`/channels/${id}`, { reason: auditReason });
     }
 
     return {
       target: id,
       snapshotId: claim.snapshotId,
       text: [
-        `${op} carried out on ${id}.`,
+        `${op} carried out on ${id}.${extra}`,
         claim.snapshotId ? `Snapshot ${claim.snapshotId} holds its settings.` : '',
         op === 'channel_delete'
           ? `snapshot_recreate_channel ${claim.snapshotId} rebuilds it — new id, empty history.`

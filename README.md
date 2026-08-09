@@ -54,7 +54,7 @@ The result is that this:
 …is a working, private-per-user ticket system. No file was written. No process was
 restarted. The next person to press the button gets the new behaviour.
 
-**The engine is a fixed ~20 files and does not grow when the server does.**
+**The engine is a fixed ~25 files and does not grow when the server does.**
 
 > [!IMPORTANT]
 > **Registry edits apply live. Engine edits do not.**
@@ -75,15 +75,16 @@ flowchart TB
     Claude["<b>Claude</b><br/>reads intent, decides, builds"]
 
     subgraph Plugin["Claude Code plugin"]
-        Skills["<b>skills/</b><br/>7 skills — authority, building,<br/>sessions, scheduling, safety"]
-        Classifer["<b>Classifer</b><br/>MCP server · 46 tools<br/>REST only, no gateway"]
+        Skills["<b>skills/</b><br/>8 skills — authority, building, events,<br/>sessions, scheduling, safety"]
+        Classifer["<b>Classifer</b><br/>MCP server · 60 tools<br/>REST only, no gateway"]
     end
 
-    Registry[("<b>Registry</b><br/>SQLite · WAL<br/>actions · components<br/>sessions · schedules<br/>audit · snapshots")]
+    Registry[("<b>Registry</b><br/>SQLite · WAL<br/>actions · components<br/>sessions · schedules<br/>triggers · counters<br/>audit · snapshots")]
 
     subgraph Bot["Cognition bot — runs 24/7"]
         Dispatcher["<b>Dispatcher</b><br/>one listener, zero handlers"]
-        Executor["<b>Executor</b><br/>15 primitives"]
+        Eventer["<b>Events</b><br/>gateway -> triggers"]
+        Executor["<b>Executor</b><br/>19 primitives"]
         Scheduler["<b>Scheduler</b><br/>cron tick, 30s"]
     end
 
@@ -94,6 +95,9 @@ flowchart TB
     Classifer -->|reads / writes| Registry
     Classifer -->|REST| Discord
     Discord -->|gateway: clicks| Dispatcher
+    Discord -->|gateway: joins, messages,<br/>reactions, deletions| Eventer
+    Eventer -->|matches| Registry
+    Eventer --> Executor
     Dispatcher -->|looks up| Registry
     Dispatcher --> Executor
     Scheduler -->|due?| Registry
@@ -119,7 +123,7 @@ answering clicks whether or not Claude Code is open.
 |---|---|---|
 | Transport | REST | Gateway (WebSocket) |
 | Lifetime | One Claude session | Continuous |
-| Handles | Building, reading, scheduling, safety | Button presses, modals, cron |
+| Handles | Building, reading, scheduling, safety | Button presses, modals, events, cron |
 | Works when the other is down | ✅ | ✅ |
 
 ---
@@ -171,7 +175,7 @@ placeholder, so the repo is not tied to one machine.
 > **Without the plugin**, every tool is still reachable:
 > ```bash
 > npm run call guild_snapshot
-> npm run check                 # list all 46 tools and smoke the server
+> npm run check                 # list all 60 tools and smoke the server
 > ```
 
 ---
@@ -180,14 +184,15 @@ placeholder, so the repo is not tied to one machine.
 
 ### Actions
 
-An action is `{key, kind, params, requires, confirm}`. Fifteen kinds compose into
+An action is `{key, kind, params, requires, confirm}`. Nineteen kinds compose into
 everything:
 
 | Group | Kinds |
 |---|---|
-| **Talking** | `reply` · `message_send` · `panel_send` · `log` |
-| **Structure** | `channel_create` · `channel_edit` · `channel_delete`⚠ · `thread_create` · `overwrite_set` |
+| **Talking** | `reply` · `message_send` · `panel_send` · `dm_send` · `log` |
+| **Structure** | `channel_create` · `channel_edit` · `channel_delete`⚠ · `thread_create` · `overwrite_set` · `guild_edit` |
 | **Roles** | `role_grant` · `role_revoke` |
+| **Reacting** | `reaction_add` · `counter_bump` |
 | **Sessions** | `session_op` |
 | **Control flow** | `sequence` · `branch` · `modal_open` |
 
@@ -295,6 +300,32 @@ and every link anyone pasted still resolves. A system that files things into an
 
 ---
 
+## Three ways an action fires
+
+| | Fired by | Good for |
+|---|---|---|
+| **Component** | a button press, through the Dispatcher | anything a person initiates |
+| **Trigger** | a gateway event | joins, keywords, reactions, out-of-band deletions |
+| **Schedule** | a cron tick | digests, sweeps, timed locks |
+
+All three read the same Registry and run through the same executor, so an action
+behaves identically whichever one fired it. Only the context differs: a button
+press can reply to someone, an event and a tick have nobody to answer.
+
+```
+registry_put    key=welcome kind=dm_send params={content: "أهلًا {{user.name}}"}
+trigger_create  key=on_join event=member_join action_key=welcome
+```
+
+`trigger_events` lists what can be listened for. A filter key an event never
+supplies is rejected at write time rather than silently never matching.
+
+**Loops cannot happen by accident.** Messages authored by Cognition never fire a
+trigger, whatever a filter says, and other bots are excluded unless `from_bot`
+is set explicitly.
+
+---
+
 ## Scheduling
 
 Two tiers, and picking the wrong one is the usual mistake.
@@ -366,7 +397,7 @@ that logged every inspection would bury the changes.
 
 ## Tool reference
 
-46 tools across seven groups. Run `npm run check` for the live list.
+60 tools across eight groups. Run `npm run check` for the live list.
 
 <details>
 <summary><b>Observe</b> — reading, never writing</summary>
@@ -411,6 +442,14 @@ that logged every inspection would bury the changes.
 </details>
 
 <details>
+<summary><b>Events and integrity</b></summary>
+
+`trigger_events` · `trigger_create` · `trigger_list` · `trigger_toggle` ·
+`trigger_delete` · `trigger_test` · `counters` · `drift_check` ·
+`registry_export` · `registry_import` · `invites_list`
+</details>
+
+<details>
 <summary><b>Safety</b></summary>
 
 `snapshot_take` · `snapshot_list` · `snapshot_restore` ·
@@ -434,6 +473,7 @@ Cognition/
 │   ├── guard.js         plan/redeem tokens for irreversible ops
 │   ├── snapshot.js      capture and restore
 │   ├── audit.js         rows + #command-log embeds
+│   ├── triggers.js      gateway events -> actions, filters, counters
 │   ├── cron.js          5-field matcher, no dependency
 │   ├── naming.js        [TEST] / [ARCHIVED] tagging
 │   └── rest.js          Discord REST with rate-limit handling
@@ -446,6 +486,7 @@ Cognition/
 ├── bot/
 │   ├── index.js         gateway client, six intents
 │   ├── dispatcher.js    one listener, zero per-feature handlers
+│   ├── events.js        gateway events routed into the Registry
 │   └── scheduler.js     30s tick, persisted dedup
 │
 ├── plugin/              the Claude Code plugin (copied at install)
@@ -454,7 +495,7 @@ Cognition/
 │       └── skills/      the seven skills
 └── scripts/
     ├── smoke.js           token · guild · Registry
-    ├── test-shared.js     90 unit tests, no network
+    ├── test-shared.js     138 unit tests, no network
     ├── call.js            any tool from the shell
     ├── classifer-check.js list tools, exercise the server
     ├── simulate-click.js  run a button without pressing it
@@ -469,8 +510,9 @@ means exactly the same thing whether a person triggered it or the clock did.
 ## Development
 
 ```bash
-npm test            # 90 unit tests — cron, naming, custom_id, guard, templates,
-                    # predicates, registry validation. No token needed.
+npm test            # 138 unit tests — cron, naming, custom_id, guard, templates,
+                    # predicates, triggers, counters, registry validation.
+                    # No token needed.
 npm run smoke       # needs a real token: proves token, guild and Registry
 npm run check       # connects to Classifer as a real MCP client
 ```

@@ -193,6 +193,49 @@ registry.putSchedule({ key: 's_ok', cron: '*/5 * * * *', actionKey: 't_reply' })
 t('schedule round trips', registry.getSchedule('s_ok').cron === '*/5 * * * *');
 t('schedule deletes', registry.deleteSchedule('s_ok') && registry.getSchedule('s_ok') === null);
 
+// ---------------------------------------------------------------- triggers
+
+describe('triggers');
+const triggers = await import('../shared/triggers.js');
+
+registry.putAction({ key: 't_post', kind: 'message_send', params: { channel_id: '1', content: 'x' } });
+t('trigger round trips', triggers.putTrigger({ key: 'tg1', event: 'message_create', actionKey: 't_post' }).event === 'message_create');
+throws('rejects an unknown event', () => triggers.putTrigger({ key: 'tg2', event: 'nope', actionKey: 't_post' }));
+throws('rejects a missing action', () => triggers.putTrigger({ key: 'tg3', event: 'member_join', actionKey: 'nope' }));
+// A filter key the event never supplies would never match, and the trigger
+// would look broken rather than misconfigured.
+throws('rejects a filter key the event cannot supply', () =>
+  triggers.putTrigger({ key: 'tg4', event: 'member_join', actionKey: 't_post', filter: { contains: 'hi' } }));
+t('accepts a valid filter', triggers.putTrigger({ key: 'tg5', event: 'message_create', actionKey: 't_post', filter: { contains: 'hi' } }).filter.contains === 'hi');
+t('lists by event', triggers.listTriggers({ event: 'message_create' }).length >= 2);
+t('deletes', triggers.deleteTrigger('tg5') && !triggers.getTrigger('tg5'));
+
+describe('trigger matching');
+const m = (f, p) => triggers.matches(f, p).pass;
+t('empty filter matches', m({}, { content: 'anything' }));
+t('contains matches', m({ contains: 'cog' }, { content: 'hello Cognition' }));
+t('contains is case insensitive', m({ contains: 'COG' }, { content: 'cognition' }));
+t('contains rejects a miss', !m({ contains: 'zzz' }, { content: 'hello' }));
+t('starts_with matches', m({ starts_with: '!' }, { content: '!ping' }));
+t('starts_with rejects mid-string', !m({ starts_with: '!' }, { content: 'a !ping' }));
+t('channel_id matches', m({ channel_id: '9' }, { channelId: '9' }));
+t('channel_id rejects another channel', !m({ channel_id: '9' }, { channelId: '8' }));
+t('has_role matches', m({ has_role: '5' }, { memberRoles: ['5', '6'] }));
+t('has_role rejects when absent', !m({ has_role: '5' }, { memberRoles: ['6'] }));
+t('emoji matches', m({ emoji: '👀' }, { emoji: '👀' }));
+// Bots are excluded unless asked for, because an action that posts a message
+// would otherwise retrigger itself at gateway speed.
+t('bots excluded by default', !m({}, { isBot: true, content: 'x' }));
+t('from_bot opts them back in', m({ from_bot: true }, { isBot: true, content: 'x' }));
+t('humans unaffected by from_bot', m({}, { isBot: false, content: 'x' }));
+
+describe('counters');
+t('starts at zero', triggers.readCounter('c_test') === 0);
+t('bumps by one', triggers.bumpCounter('c_test') === 1);
+t('bumps by n', triggers.bumpCounter('c_test', 5) === 6);
+t('persists', triggers.readCounter('c_test') === 6);
+t('appears in the list', triggers.listCounters().some((c) => c.key === 'c_test'));
+
 // ---------------------------------------------------------------- version
 
 describe('engine fingerprint');

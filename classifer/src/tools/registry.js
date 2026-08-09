@@ -200,6 +200,17 @@ ACTION KINDS
   role_grant       params: {role_id, user_id?}    default user_id is the presser
   role_revoke      params: {role_id, user_id?}
   overwrite_set    params: {channel_id, target_id, target_type?=role, allow[], deny[]}
+  guild_edit       params: {name}                 renames the server itself
+
+  dm_send          params: {user_id?, content?, embed?}
+                   Defaults to the presser. Closed DMs are reported, not fatal.
+
+  reaction_add     params: {emoji, channel_id?, message_id?}
+                   Defaults to the message in context, so it works from a trigger.
+
+  counter_bump     params: {key, by?=1, pad?, then?}
+                   Bumps a persistent counter and binds {{counter.value}} inside
+                   "then". This is how you get ticket-0007 rather than a snowflake.
 
   modal_open       params: {title, fields[{key,label,style?,required?,placeholder?,max?}],
                             on_submit: <action key>}

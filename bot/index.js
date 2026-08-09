@@ -8,13 +8,15 @@
 // Run it with `npm run bot`. It needs to stay running for buttons to respond;
 // Classifer keeps working without it.
 
-import { Client, GatewayIntentBits, Events, ActivityType } from 'discord.js';
+import { Client, GatewayIntentBits, Events, ActivityType, Partials } from 'discord.js';
 import { requireEnv, TOKEN, GUILD_ID } from '../shared/env.js';
 import { getDb, setSetting } from '../shared/store.js';
 import { log as auditLog } from '../shared/audit.js';
 import { engineHash } from '../shared/version.js';
 import { listSchedules } from '../shared/registry.js';
+import { listTriggers } from '../shared/triggers.js';
 import { attach } from './dispatcher.js';
+import { attach as attachEvents } from './events.js';
 import { start as startScheduler } from './scheduler.js';
 
 requireEnv();
@@ -29,9 +31,11 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildIntegrations,
   ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember],
 });
 
 attach(client);
+attachEvents(client);
 
 let stopScheduler = () => {};
 
@@ -41,7 +45,8 @@ client.once(Events.ClientReady, async (ready) => {
   console.error(`[cognition] guild: ${guild ? guild.name : `NOT IN GUILD ${GUILD_ID}`}`);
 
   const schedules = listSchedules({ enabledOnly: true });
-  console.error(`[cognition] ${schedules.length} enabled schedule(s)`);
+  const triggers = listTriggers({ enabledOnly: true });
+  console.error(`[cognition] ${schedules.length} enabled schedule(s), ${triggers.length} enabled trigger(s)`);
 
   // Record which build of the engine this process actually loaded. Node caches
   // modules at import, so from here on this process runs THIS code no matter

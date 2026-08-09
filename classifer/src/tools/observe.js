@@ -211,7 +211,7 @@ tool({
     'The most recent entries from the Registry audit table — every Classifer call, every button press the Dispatcher handled, every scheduled run. This is the complete record; #command-log only shows the changes.',
   schema: {
     limit: z.number().int().min(1).max(200).default(25).optional(),
-    source: z.enum(['classifer', 'dispatcher', 'scheduler', 'bootstrap']).optional(),
+    source: z.enum(['classifer', 'dispatcher', 'scheduler', 'trigger', 'bootstrap']).optional(),
     result: z.enum(['ok', 'error', 'plan']).optional(),
   },
   async run({ limit = 25, source, result }) {
