@@ -17,6 +17,7 @@ export const ACTION_KINDS = [
   'role_grant',
   'role_revoke',
   'overwrite_set',
+  'guild_edit',
   'message_send',
   'panel_send',
   'thread_create',

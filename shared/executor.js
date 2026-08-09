@@ -246,6 +246,17 @@ export async function execute(ref, ctx, depth = 0) {
       return { log, created: thread };
     }
 
+    case 'guild_edit': {
+      // Renaming the server from a button is the bounded form of what people
+      // otherwise ask for in free text: one operation, one field, gated by
+      // whatever requires clause the row carries.
+      if (!p.name) throw new ActionError('guild_edit needs a name.');
+      const before = await get(guildRoute());
+      await patch(guildRoute(), { name: String(p.name).slice(0, 100) }, { reason });
+      log.push(`renamed guild "${before.name}" -> "${p.name}"`);
+      break;
+    }
+
     case 'overwrite_set': {
       if (!p.channel_id || !p.target_id) throw new ActionError('overwrite_set needs channel_id and target_id.');
       await put(
