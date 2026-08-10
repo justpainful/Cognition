@@ -136,6 +136,16 @@ const scope = template.buildScope({
 t('renders user name', template.renderString('ticket-{{user.name}}', scope) === 'ticket-kuroi');
 t('renders a mention', template.renderString('{{user.mention}}', scope) === '<@7>');
 t('renders an arg', template.renderString('{{arg.0}}', scope) === 'alpha');
+// A role and a channel are mentioned differently, and what was just created
+// knows which it is.
+t(
+  'a created channel mentions as a channel',
+  template.renderString('{{created.mention}}', template.buildScope({ created: { id: '4', type: 0 } })) === '<#4>',
+);
+t(
+  'a created role mentions as a role',
+  template.renderString('{{created.mention}}', template.buildScope({ created: { id: '5', permissions: '0' } })) === '<@&5>',
+);
 t('renders a modal field', template.renderString('{{field.reason}}', scope) === 'because');
 t('is case insensitive', template.renderString('{{USER.NAME}}', scope) === 'kuroi');
 t('tolerates whitespace', template.renderString('{{ user.name }}', scope) === 'kuroi');

@@ -22,6 +22,19 @@ import { bumpCounter } from './triggers.js';
 const MAX_DEPTH = 8;
 const BUTTON_STYLE = { primary: 1, secondary: 2, success: 3, danger: 4 };
 
+// Presence is the one thing here that REST cannot do: a status lives on the
+// gateway connection, and only the bot process holds one. It registers a sink
+// at startup; Classifer and one-off scripts find none, and presence_set says so
+// instead of pretending it worked — the same shape as reply with no ctx.respond.
+let presenceSink = null;
+
+/** Called once by the bot process. Passing null unregisters. */
+export function setPresenceSink(fn) {
+  presenceSink = fn;
+}
+
+const ACTIVITY_TYPE = { playing: 0, streaming: 1, listening: 2, watching: 3, custom: 4, competing: 5 };
+
 export class ActionError extends Error {
   constructor(message, { userFacing = true } = {}) {
     super(message);
@@ -106,6 +119,36 @@ export async function execute(ref, ctx, depth = 0) {
       } else {
         log.push(`reply skipped — no interaction to answer in a ${ctx.source ?? 'system'} context`);
       }
+      break;
+    }
+
+    case 'presence_set': {
+      // One row, one gateway payload: a second presence_set replaces the first
+      // rather than adding to it, so anything meant to appear together has to
+      // travel together in "activities".
+      const wanted = Array.isArray(p.activities) && p.activities.length ? p.activities : [p];
+      const activities = wanted.map((a) => {
+        const kind = String(a.activity ?? 'watching').toLowerCase();
+        const type = ACTIVITY_TYPE[kind];
+        if (type === undefined) {
+          throw new ActionError(
+            `presence_set: unknown activity "${kind}". Use ${Object.keys(ACTIVITY_TYPE).join(', ')}.`,
+          );
+        }
+        if (!a.text) throw new ActionError(`presence_set: the "${kind}" entry has no text.`);
+        if (type === 1 && !a.url) throw new ActionError('presence_set: "streaming" needs a url.');
+        return { type, text: String(a.text).slice(0, 128), url: a.url ? String(a.url) : undefined };
+      });
+
+      if (!presenceSink) {
+        log.push('presence skipped — this process holds no gateway connection');
+        break;
+      }
+      await presenceSink({
+        activities,
+        status: ['online', 'idle', 'dnd', 'invisible'].includes(p.status) ? p.status : 'online',
+      });
+      log.push(`presence: ${activities.map((a) => `${a.type}:${a.text}`).join(' + ')}`);
       break;
     }
 
@@ -325,6 +368,31 @@ export async function execute(ref, ctx, depth = 0) {
     }
 
     // ---- roles ------------------------------------------------------------
+
+    case 'role_create': {
+      // The role is created without a single permission bit. Anything a role is
+      // allowed to do is set per channel through overwrite_set, so a role made
+      // from a button can never quietly become more powerful than the channel
+      // it was made for.
+      if (!p.name) throw new ActionError('role_create needs a name.');
+      const created = await post(
+        guildRoute('/roles'),
+        {
+          name: String(p.name).slice(0, 100),
+          permissions: '0',
+          color: p.color ? Number(p.color) : 0,
+          hoist: !!p.hoist,
+          mentionable: !!p.mentionable,
+        },
+        { reason },
+      );
+      log.push(`created role ${created.name} (${created.id})`);
+      if (p.then) {
+        const nested = await execute(p.then, { ...ctx, created }, depth + 1);
+        log.push(...nested.log);
+      }
+      return { log, created };
+    }
 
     case 'role_grant':
     case 'role_revoke': {

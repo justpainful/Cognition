@@ -13,7 +13,8 @@ import { requireEnv, TOKEN, GUILD_ID } from '../shared/env.js';
 import { getDb, setSetting } from '../shared/store.js';
 import { log as auditLog } from '../shared/audit.js';
 import { engineHash } from '../shared/version.js';
-import { listSchedules } from '../shared/registry.js';
+import { listSchedules, getAction } from '../shared/registry.js';
+import { execute, systemContext, setPresenceSink } from '../shared/executor.js';
 import { listTriggers } from '../shared/triggers.js';
 import { attach } from './dispatcher.js';
 import { attach as attachEvents } from './events.js';
@@ -37,6 +38,20 @@ const client = new Client({
 attach(client);
 attachEvents(client);
 
+// Hand the executor the one capability it cannot reach over REST. A custom
+// status is the odd one out in the gateway's own encoding: the text travels in
+// `state` and the name is ignored, so it is translated here rather than leaking
+// that detail into every Registry row that sets one.
+setPresenceSink(({ activities, status }) => {
+  if (!client.user) throw new Error('the gateway is not ready yet');
+  client.user.setPresence({
+    status,
+    activities: activities.map(({ type, text, url }) =>
+      type === 4 ? { name: 'Custom Status', type: 4, state: text } : { name: text, type, url },
+    ),
+  });
+});
+
 let stopScheduler = () => {};
 
 client.once(Events.ClientReady, async (ready) => {
@@ -56,10 +71,27 @@ client.once(Events.ClientReady, async (ready) => {
   setSetting('bot_started_at', new Date().toISOString());
   console.error(`[cognition] engine build ${build}`);
 
-  ready.user.setPresence({
-    status: 'online',
-    activities: [{ name: 'the Registry', type: ActivityType.Watching }],
-  });
+  // The status is behaviour like any other, so it is a row: if presence.boot
+  // exists it decides what the bot appears to be doing, and editing that row
+  // changes the status on the next run of it — no edit here, no restart.
+  if (getAction('presence.boot')) {
+    await execute('presence.boot', systemContext()).catch((e) =>
+      console.error(`[cognition] presence.boot failed: ${e.message}`),
+    );
+    // What the gateway kept, not what we asked for. Discord silently drops
+    // activities a bot may not use, and without this the difference is
+    // invisible from here.
+    console.error(
+      `[cognition] presence: ${JSON.stringify(
+        (ready.user.presence?.activities ?? []).map((a) => ({ name: a.name, type: a.type, url: a.url })),
+      )}`,
+    );
+  } else {
+    ready.user.setPresence({
+      status: 'online',
+      activities: [{ name: 'the Registry', type: ActivityType.Watching }],
+    });
+  }
 
   stopScheduler = startScheduler();
 

@@ -126,7 +126,10 @@ tool({
   schema: {
     key: z.string().optional().describe('omit to mint a new key'),
     action_key: z.string(),
-    kind: z.enum(['button', 'select', 'modal']).default('button'),
+    kind: z
+      .enum(['button', 'select', 'modal', 'command'])
+      .default('button')
+      .describe('a "command" row is reached by a slash command whose key is cmd:<name>'),
     spec: z.record(z.string(), z.any()).default({}),
     session_id: z.number().int().nullable().optional(),
   },
@@ -207,6 +210,12 @@ ACTION KINDS
 
   reaction_add     params: {emoji, channel_id?, message_id?}
                    Defaults to the message in context, so it works from a trigger.
+
+  presence_set     params: {activity?=watching, text, url?, status?=online}
+                   activity: playing|streaming|listening|watching|custom|competing.
+                   "custom" drops the verb and shows the text alone. Only the bot
+                   process can do this, so it no-ops from Classifer. Discord shows
+                   a bot's verb and text only — no image, timer, or button.
 
   counter_bump     params: {key, by?=1, pad?, then?}
                    Bumps a persistent counter and binds {{counter.value}} inside

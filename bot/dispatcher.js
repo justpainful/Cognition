@@ -66,9 +66,22 @@ function buildContext(interaction, { args = [], fields = {}, session = null, res
 
 export function attach(client) {
   client.on(Events.InteractionCreate, async (interaction) => {
-    if (!interaction.isButton() && !interaction.isAnySelectMenu() && !interaction.isModalSubmit()) return;
+    const isCommand = interaction.isChatInputCommand();
+    if (!isCommand && !interaction.isButton() && !interaction.isAnySelectMenu() && !interaction.isModalSubmit()) {
+      return;
+    }
 
-    const decoded = decode(interaction.customId);
+    // A slash command is routed the same way a button is: the command name is a
+    // Registry key, `cmd:<name>`. There is no per-command handler here for the
+    // same reason there is no per-button one — the command is a row, and the
+    // one registered with Discord is only the door it comes through.
+    const decoded = isCommand
+      ? {
+          key: `cmd:${interaction.commandName}`,
+          // Subcommand entries carry no value of their own; only the leaves do.
+          args: interaction.options.data.filter((o) => o.value !== undefined).map((o) => String(o.value)),
+        }
+      : decode(interaction.customId);
     // Not ours. Another bot's component, or an id from before this encoding.
     if (!decoded) return;
 
@@ -76,8 +89,9 @@ export function attach(client) {
     if (!component) {
       await interaction
         .reply({
-          content:
-            'This control is no longer defined. It was removed from the Registry — the panel it sits on is stale and should be reposted.',
+          content: isCommand
+            ? `This command is registered with Discord but has no "${decoded.key}" row in the Registry, so there is nothing for it to do yet.`
+            : 'This control is no longer defined. It was removed from the Registry — the panel it sits on is stale and should be reposted.',
           flags: MessageFlags.Ephemeral,
         })
         .catch(() => {});

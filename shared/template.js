@@ -32,9 +32,13 @@ export function buildScope(ctx = {}) {
     scope['channel.mention'] = channel.id ? `<#${channel.id}>` : '';
   }
   if (created) {
+    // A role and a channel are mentioned differently, and the thing that was
+    // just created knows which it is: a Discord role carries a permissions
+    // field and no channel type.
+    const isRole = created.type === undefined && created.permissions !== undefined;
     scope['created.id'] = created.id ?? '';
     scope['created.name'] = created.name ?? '';
-    scope['created.mention'] = created.id ? `<#${created.id}>` : '';
+    scope['created.mention'] = created.id ? (isRole ? `<@&${created.id}>` : `<#${created.id}>`) : '';
   }
   if (session) {
     scope['session.id'] = String(session.id ?? '');
