@@ -1,0 +1,18 @@
+{
+  "guild": "1535979812860993617",
+
+  "category:Tickets": "1536064615635484766",
+  "category:Command": "1536064004903145472",
+  "category:Sandbox": "1536064011295129640",
+
+  "channel:command-log": "1536064006542983259",
+  "channel:active-sessions": "1536064008745127966",
+  "channel:ticket-open": "1536064617795559578",
+  "channel:ticket-log": "1536064619360166009",
+  "channel:control": "1536126506139385926",
+  "channel:welcome": "1536151258271064146",
+
+  "role:Operator": "1536064012557754461",
+  "role:Moderator": "1536057723270078464",
+  "role:Admin": "1536057835706917066"
+}

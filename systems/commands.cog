@@ -1,0 +1,26 @@
+-- Slash commands, and what the bot says it is doing.
+--
+-- A command is a door. Discord registers the name; what comes through it is a
+-- row like any other, which is why there is no handler here for either of them.
+
+command ping {
+  say "Cognition is up. The dispatcher answered this from the Registry, not from code."
+}
+
+command about {
+  say embed {
+    title "Cognition"
+    body """
+A Discord server run as a lab. Claude holds the controls, this bot executes, and every behaviour — buttons, schedules, and this command — is a row in the Registry rather than a deploy.
+"""
+    footer "github.com/justpainful/Cognition"
+  }
+}
+
+-- The status is behaviour too, so it is a row. Editing this changes what the
+-- bot appears to be doing the next time the row runs, with no restart.
+intent presence {
+  verb boot {
+    presence streaming "Cognition" at "https://www.twitch.tv/discord"
+  }
+}

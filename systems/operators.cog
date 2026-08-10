@@ -1,0 +1,34 @@
+-- Controls that only an Operator can reach.
+--
+-- Every verb here carries its own guard. That matters more than it looks:
+-- the check is on the row, not on the button, so nothing is bypassed by
+-- reaching the same action another way.
+
+intent op {
+
+  -- Renaming the server, in two halves: the box that asks, and the row that
+  -- acts on the answer. Both are guarded, because the second one can be
+  -- reached without the first.
+  verb rename_guild {
+    needs @user has @role("Operator")
+
+    ask "اسم السيرفر" {
+      line "الاسم الجديد" named name max 100 required
+    } then rename_guild_do
+  }
+
+  verb rename_guild_do {
+    needs @user has @role("Operator")
+    rename @guild to "@field.name"
+  }
+
+  -- Archiving is reversible on purpose: the channel is renamed and locked for
+  -- writing rather than deleted, so a snapshot can put it back.
+  verb archive_channel {
+    needs @user has @role("Operator")
+
+    rename @here prefix "archived-"
+    hide @everyone [write] at @here
+    say "تم، الروم صار مؤرشف ومقفل للكتابة، والتراجع بـsnapshot"
+  }
+}

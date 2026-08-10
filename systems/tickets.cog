@@ -1,0 +1,56 @@
+-- The ticket system.
+--
+-- This is the same system that has been running as hand-written Registry rows
+-- since the first acceptance test. Nothing about the running server changes by
+-- writing it here; what changes is that the rules are readable and that a
+-- mistake in them is caught before anyone presses anything.
+
+intent ticket {
+
+  -- One ticket each. The host checks this before the row runs, so a second
+  -- press gets a refusal instead of a second channel.
+  verb open {
+    needs no @channel("ticket-@user.name")
+
+    make channel "ticket-@user.name"
+      under @category("Tickets")
+      topic "Ticket for @user.display · opened @now"
+    {
+      hide @everyone
+      show @user [read, write, history, attach, embed]
+      show @role("Operator") [read, write, history, manage]
+    }
+
+    then {
+      panel at @made "@user.mention — describe the problem here. An Operator will pick it up." {
+        button "Close ticket" danger "🔒" -> close(@made)
+      }
+
+      post @channel("ticket-log") embed {
+        title "Ticket opened"
+        body "@made.mention by @user.mention"
+        colour green
+        footer "@now"
+      }
+
+      say "Your ticket is open: @made.mention"
+    }
+  }
+
+  -- The channel to close arrives from the button that was posted inside it, so
+  -- one stored row closes every ticket there will ever be.
+  verb close(target) {
+    needs @user has @role("Operator")
+
+    rename target prefix "closed-"
+
+    post @channel("ticket-log") embed {
+      title "Ticket closed"
+      body "@target.mention closed by @user.mention"
+      colour red
+      footer "@now"
+    }
+
+    say "Closed. The channel is renamed and logged."
+  }
+}

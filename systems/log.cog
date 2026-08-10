@@ -1,0 +1,32 @@
+-- What the server notices on its own.
+--
+-- Three things that happen with nobody pressing anything: a day starts, a
+-- channel disappears without going through the confirmation gate, and someone
+-- says the bot's name.
+
+every day at 00:03 {
+  post @channel("command-log") embed {
+    title "── @today ──"
+    body "A new day of activity begins below."
+    colour 3426654
+  }
+}
+
+-- A channel deleted from Discord's own menu never reaches the confirmation
+-- gate, so this is how the system finds out it lost one.
+on channel.deleted {
+  post @channel("command-log") embed {
+    title "⚠ روم انحذف من خارج النظام"
+    body """
+الروم **@here.name** (`@here.id`) انحذف بدون ما يمر على بوابة التأكيد
+
+لو ما كان مقصود، شغّل drift_check عشان تشوف وش انكسر معه
+"""
+    colour red
+    footer "@now"
+  }
+}
+
+on message.posted when contains "cognition" {
+  react "👀"
+}

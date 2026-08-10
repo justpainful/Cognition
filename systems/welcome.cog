@@ -1,0 +1,32 @@
+-- Welcoming a new member.
+--
+-- Nobody presses anything for this to happen. The member joining is the whole
+-- input, and `count members up by 1` is what gives the greeting a number to
+-- say out loud.
+
+on member.joins {
+  count members up by 1 padded 3
+
+  post @channel("welcome") "أهلًا @user.mention 👋" embed {
+    title "عضو جديد · رقم @count"
+    body """
+**@user.name** انضم للسيرفر
+
+هذا سيرفر مختبر للبوتات والتجارب البرمجية، وكل نظام تشوفه هنا مبني كبيانات مو ككود
+
+**وين تروح**
+@channel("ticket-open").mention افتح تذكرة لو تحتاج شي
+@channel("command-log").mention كل شي يسويه النظام مسجل هنا وتقدر تقراه
+
+وهذي الرسالة نفسها ما ضغط أحد زر عشان ترسلها، جتك من مشغّل مربوط بحدث دخولك
+"""
+    colour green
+    footer "@today"
+  } mentioning
+
+  tell @user """
+أهلًا فيك في Cognition 👋
+
+حاب أرحب فيك على الخاص بعد، وكل اللي تحتاجه موجود بروم الترحيب
+"""
+}
